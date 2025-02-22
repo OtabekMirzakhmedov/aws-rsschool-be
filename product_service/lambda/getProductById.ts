@@ -45,7 +45,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         }
 
         const response: SingleProductResponse = {
-            success: true,
             data: {
                 product
             }

@@ -15,7 +15,6 @@ export const handler = async (_event: APIGatewayProxyEvent): Promise<APIGatewayP
 
         const products: Product[] = JSON.parse(process.env.PRODUCTS);
 
-        // Return the products array directly
         return {
             statusCode: 200,
             headers: HEADERS,
