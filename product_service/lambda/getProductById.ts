@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { Product, SingleProductResponse, ErrorResponse } from '../types/interfaces';
+import { Product, ErrorResponse } from '../types/interfaces';
 
 const HEADERS = {
     "Content-Type": "application/json",
@@ -9,7 +9,8 @@ const HEADERS = {
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     try {
-        const productId = event.pathParameters?.id;
+
+        const productId = event.pathParameters?.productId;
 
         if (!productId) {
             return {
@@ -44,16 +45,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             };
         }
 
-        const response: SingleProductResponse = {
-            data: {
-                product
-            }
-        };
-
         return {
             statusCode: 200,
             headers: HEADERS,
-            body: JSON.stringify(response)
+            body: JSON.stringify(product)
         };
 
     } catch (error) {
