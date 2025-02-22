@@ -9,7 +9,7 @@ servers:
     description: "API Gateway endpoint"
     variables:
       apiId:
-        default: "pktpl4mg29"
+        default: "2iaoohc9gd"
       region:
         default: "eu-west-1"
       stage:
