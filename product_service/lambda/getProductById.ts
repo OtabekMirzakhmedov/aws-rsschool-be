@@ -1,71 +1,51 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { Product, ErrorResponse } from '../types/interfaces';
+import { GetCommand } from '@aws-sdk/lib-dynamodb';
+import { docClient } from './utils/dynamodb-client';
+import { createSuccessResponse, createErrorResponse } from './utils/http';
+import { Product, Stock } from '../types/interfaces';
 
-const HEADERS = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": process.env.ALLOWED_ORIGIN || "*",
-    "Access-Control-Allow-Methods": "GET"
-};
+const PRODUCTS_TABLE = process.env.PRODUCTS_TABLE;
+const STOCKS_TABLE = process.env.STOCKS_TABLE;
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    try {
+    console.log('Incoming request for getProductById:', event);
 
+    try {
         const productId = event.pathParameters?.productId;
 
         if (!productId) {
-            return {
-                statusCode: 400,
-                headers: HEADERS,
-                body: JSON.stringify({
-                    success: false,
-                    error: {
-                        message: "Product ID is required"
-                    }
-                })
-            };
+            return createErrorResponse(400, "Product ID is required");
         }
 
-        if (!process.env.PRODUCTS) {
-            throw new Error('PRODUCTS environment variable is not set');
+        // Get product by ID
+        const productResponse = await docClient.send(new GetCommand({
+            TableName: PRODUCTS_TABLE,
+            Key: { id: productId }
+        }));
+
+        if (!productResponse.Item) {
+            return createErrorResponse(404, `Product with ID ${productId} not found`);
         }
 
-        const products: Product[] = JSON.parse(process.env.PRODUCTS);
-        const product = products.find(p => p.id === productId);
+        const product = productResponse.Item as Product;
 
-        if (!product) {
-            return {
-                statusCode: 404,
-                headers: HEADERS,
-                body: JSON.stringify({
-                    success: false,
-                    error: {
-                        message: `Product with ID ${productId} not found`
-                    }
-                })
-            };
-        }
+        // Get stock information for this product
+        const stockResponse = await docClient.send(new GetCommand({
+            TableName: STOCKS_TABLE,
+            Key: { product_id: productId }
+        }));
 
-        return {
-            statusCode: 200,
-            headers: HEADERS,
-            body: JSON.stringify(product)
+        const stock = stockResponse.Item as Stock;
+
+        // Join product with its stock information
+        const joinedProduct = {
+            ...product,
+            count: stock ? stock.count : 0
         };
 
+        return createSuccessResponse(200, joinedProduct);
     } catch (error) {
         console.error('Error in getProductById:', error);
-
-        const errorResponse: ErrorResponse = {
-            success: false,
-            error: {
-                message: "Internal server error",
-                details: process.env.NODE_ENV !== 'production' ? error : undefined
-            }
-        };
-
-        return {
-            statusCode: 500,
-            headers: HEADERS,
-            body: JSON.stringify(errorResponse)
-        };
+        return createErrorResponse(500, "Internal server error", error);
     }
 };

@@ -1,41 +1,40 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { Product, ErrorResponse } from '../types/interfaces';
+import { ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { docClient } from './utils/dynamodb-client';
+import { createSuccessResponse, createErrorResponse } from './utils/http';
+import { Product, Stock } from '../types/interfaces';
 
-const HEADERS = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": process.env.ALLOWED_ORIGIN || "*",
-    "Access-Control-Allow-Methods": "GET"
-};
+const PRODUCTS_TABLE = process.env.PRODUCTS_TABLE;
+const STOCKS_TABLE = process.env.STOCKS_TABLE;
 
-export const handler = async (_event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+    console.log('Incoming request for getProductsList:', event);
+
     try {
-        if (!process.env.PRODUCTS) {
-            throw new Error('PRODUCTS environment variable is not set');
-        }
+        // Scan products table
+        const productsResponse = await docClient.send(new ScanCommand({
+            TableName: PRODUCTS_TABLE
+        }));
+        const products: Product[] = productsResponse.Items as Product[];
 
-        const products: Product[] = JSON.parse(process.env.PRODUCTS);
+        // Scan stocks table
+        const stocksResponse = await docClient.send(new ScanCommand({
+            TableName: STOCKS_TABLE
+        }));
+        const stocks: Stock[] = stocksResponse.Items as Stock[];
 
-        return {
-            statusCode: 200,
-            headers: HEADERS,
-            body: JSON.stringify(products)
-        };
+        // Join products with their stock information
+        const joinedProducts = products.map(product => {
+            const stock = stocks.find(s => s.product_id === product.id);
+            return {
+                ...product,
+                count: stock ? stock.count : 0
+            };
+        });
 
+        return createSuccessResponse(200, joinedProducts);
     } catch (error) {
         console.error('Error in getProductsList:', error);
-
-        const errorResponse: ErrorResponse = {
-            success: false,
-            error: {
-                message: "Internal server error",
-                details: process.env.NODE_ENV !== 'production' ? error : undefined
-            }
-        };
-
-        return {
-            statusCode: 500,
-            headers: HEADERS,
-            body: JSON.stringify(errorResponse)
-        };
+        return createErrorResponse(500, "Internal server error", error);
     }
 };
