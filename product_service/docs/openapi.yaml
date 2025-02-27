@@ -1,0 +1,92 @@
+openapi: "3.0.0"
+info:
+  title: "Product Service API"
+  version: "1.0.0"
+  description: "API documentation for the Product Service, which provides endpoints for retrieving product data."
+servers:
+  - url: "https://{apiId}.execute-api.{region}.amazonaws.com/{stage}"
+
+    description: "API Gateway endpoint"
+    variables:
+      apiId:
+        default: "2iaoohc9gd"
+      region:
+        default: "eu-west-1"
+      stage:
+        default: "dev"
+paths:
+  /products:
+    get:
+      summary: "Get a list of all products"
+      operationId: "getProductsList"
+      responses:
+        '200':
+          description: "A JSON array of products"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        '500':
+          description: "Internal server error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /products/{productId}:
+    get:
+      summary: "Get a product by its ID"
+      operationId: "getProductsById"
+      parameters:
+        - name: "productId"
+          in: "path"
+          required: true
+          description: "The ID of the product"
+          schema:
+            type: "string"
+      responses:
+        '200':
+          description: "Product details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        '404':
+          description: "Product not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    Product:
+      type: "object"
+      properties:
+        id:
+          type: "string"
+          example: "7567ec4b-b10c-48c5-9345-fc73c48a80aa"
+        title:
+          type: "string"
+          example: "iPhone 14 Pro"
+        description:
+          type: "string"
+          example: "Latest iPhone model with A16 Bionic chip, featuring a 6.1-inch Super Retina XDR display"
+        price:
+          type: "number"
+          example: 999
+    ErrorResponse:
+      type: "object"
+      properties:
+        success:
+          type: "boolean"
+          example: false
+        error:
+          type: "object"
+          properties:
+            message:
+              type: "string"
+              example: "Product not found"
+            details:
+              type: "string"
+              example: "Detailed error message here."
