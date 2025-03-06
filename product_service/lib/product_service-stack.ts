@@ -101,4 +101,3 @@ export class ProductServiceStack extends cdk.Stack {
     singleProductResource.addMethod('GET', new apigw.LambdaIntegration(getProductById));
   }
 }
-
