@@ -2,10 +2,9 @@ openapi: "3.0.0"
 info:
   title: "Product Service API"
   version: "1.0.0"
-  description: "API documentation for the Product Service, which provides endpoints for retrieving product data."
+  description: "API documentation for the Product Service, which provides endpoints for retrieving and creating product data."
 servers:
   - url: "https://{apiId}.execute-api.{region}.amazonaws.com/{stage}"
-
     description: "API Gateway endpoint"
     variables:
       apiId:
@@ -21,13 +20,41 @@ paths:
       operationId: "getProductsList"
       responses:
         '200':
-          description: "A JSON array of products"
+          description: "A JSON array of products with stock information"
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Product"
+                  $ref: "#/components/schemas/ProductWithStock"
+        '500':
+          description: "Internal server error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: "Create a new product"
+      operationId: "createProduct"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        '201':
+          description: "Product created successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductWithStock"
+        '400':
+          description: "Invalid input"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           description: "Internal server error"
           content:
@@ -47,13 +74,19 @@ paths:
             type: "string"
       responses:
         '200':
-          description: "Product details"
+          description: "Product details with stock information"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Product"
+                $ref: "#/components/schemas/ProductWithStock"
         '404':
           description: "Product not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '500':
+          description: "Internal server error"
           content:
             application/json:
               schema:
@@ -75,6 +108,37 @@ components:
         price:
           type: "number"
           example: 999
+      required:
+        - id
+        - title
+        - price
+    ProductWithStock:
+      allOf:
+        - $ref: "#/components/schemas/Product"
+        - type: "object"
+          properties:
+            count:
+              type: "number"
+              description: "Number of items in stock"
+              example: 42
+    ProductInput:
+      type: "object"
+      properties:
+        title:
+          type: "string"
+          example: "iPhone 14 Pro"
+        description:
+          type: "string"
+          example: "Latest iPhone model with A16 Bionic chip, featuring a 6.1-inch Super Retina XDR display"
+        price:
+          type: "number"
+          example: 999
+        count:
+          type: "number"
+          example: 10
+      required:
+        - title
+        - price
     ErrorResponse:
       type: "object"
       properties:
