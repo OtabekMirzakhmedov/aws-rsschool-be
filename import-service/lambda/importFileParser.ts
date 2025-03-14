@@ -1,12 +1,14 @@
 import { S3Client, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import { S3Event, S3Handler } from 'aws-lambda';
 import { Readable } from 'stream';
 const csvParser = require('csv-parser');
 
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
+const sqsClient = new SQSClient({ region: process.env.AWS_REGION });
+const SQS_URL = process.env.SQS_URL;
 
 export const handler: S3Handler = async (event: S3Event) => {
-
     console.log("S3 event received:", JSON.stringify(event));
 
     for (const record of event.Records) {
@@ -25,14 +27,25 @@ export const handler: S3Handler = async (event: S3Event) => {
 
             const stream = response.Body as Readable;
 
+            // Parse CSV and send records to SQS
             await new Promise<void>((resolve, reject) => {
                 stream
                     .pipe(csvParser())
-                    .on('data', (data: any) => {
-                        console.log("Parsed record:", data);
+                    .on('data', async (data: any) => {
+                        try {
+                            // Send each record to SQS
+                            await sqsClient.send(new SendMessageCommand({
+                                QueueUrl: SQS_URL,
+                                MessageBody: JSON.stringify(data),
+                            }));
+                            console.log("Record sent to SQS:", data);
+                        } catch (error) {
+                            console.error("Error sending record to SQS:", error);
+                            // Continue processing other records
+                        }
                     })
                     .on('end', () => {
-                        console.log("CSV parsing complete.");
+                        console.log("CSV parsing complete and records sent to SQS.");
                         resolve();
                     })
                     .on('error', (error: any) => {
@@ -41,6 +54,7 @@ export const handler: S3Handler = async (event: S3Event) => {
                     });
             });
 
+            // Move the file from uploaded to parsed folder
             const newKey = key.replace("uploaded/", "parsed/");
 
             const copyParams = {
@@ -52,6 +66,7 @@ export const handler: S3Handler = async (event: S3Event) => {
             await s3Client.send(copyCommand);
             console.log(`File copied to ${newKey}`);
 
+            // Delete from uploaded folder
             const deleteParams = { Bucket: bucket, Key: key };
             const deleteCommand = new DeleteObjectCommand(deleteParams);
             await s3Client.send(deleteCommand);
