@@ -33,7 +33,6 @@ export const handler: S3Handler = async (event: S3Event) => {
                     .pipe(csvParser())
                     .on('data', async (data: any) => {
                         try {
-                            // Send each record to SQS
                             await sqsClient.send(new SendMessageCommand({
                                 QueueUrl: SQS_URL,
                                 MessageBody: JSON.stringify(data),
@@ -41,7 +40,6 @@ export const handler: S3Handler = async (event: S3Event) => {
                             console.log("Record sent to SQS:", data);
                         } catch (error) {
                             console.error("Error sending record to SQS:", error);
-                            // Continue processing other records
                         }
                     })
                     .on('end', () => {
@@ -53,8 +51,6 @@ export const handler: S3Handler = async (event: S3Event) => {
                         reject(error);
                     });
             });
-
-            // Move the file from uploaded to parsed folder
             const newKey = key.replace("uploaded/", "parsed/");
 
             const copyParams = {
@@ -66,7 +62,6 @@ export const handler: S3Handler = async (event: S3Event) => {
             await s3Client.send(copyCommand);
             console.log(`File copied to ${newKey}`);
 
-            // Delete from uploaded folder
             const deleteParams = { Bucket: bucket, Key: key };
             const deleteCommand = new DeleteObjectCommand(deleteParams);
             await s3Client.send(deleteCommand);
