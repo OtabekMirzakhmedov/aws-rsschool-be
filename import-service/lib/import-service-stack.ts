@@ -4,7 +4,12 @@ import * as apigw from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { Construct } from 'constructs';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
 
 export class ImportServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -13,7 +18,13 @@ export class ImportServiceStack extends cdk.Stack {
     const importBucket = s3.Bucket.fromBucketName(
         this,
         'ImportBucket',
-        process.env.BUCKET_NAME
+        process.env.BUCKET_NAME || 'default-bucket-name'
+    );
+
+    const catalogItemsQueue = sqs.Queue.fromQueueArn(
+        this,
+        'CatalogItemsQueue',
+        'arn:aws:sqs:' + this.region + ':' + this.account + ':catalogItemsQueue'
     );
 
     const importProductsFile = new lambda.Function(this, 'ImportProductsFileFunction', {
@@ -55,7 +66,9 @@ export class ImportServiceStack extends cdk.Stack {
       handler: 'importFileParser.handler',
       code: lambda.Code.fromAsset('lambda'),
       environment: {
-        BUCKET_NAME: importBucket.bucketName
+        BUCKET_NAME: importBucket.bucketName,
+        REGION: this.region,
+        SQS_URL: catalogItemsQueue.queueUrl || ''
       }
     });
 
@@ -63,6 +76,8 @@ export class ImportServiceStack extends cdk.Stack {
       actions: ['s3:GetObject', 's3:CopyObject', 's3:DeleteObject', 's3:PutObject'],
       resources: [`${importBucket.bucketArn}/*`]
     }));
+
+    catalogItemsQueue.grantSendMessages(importFileParser);
 
     importBucket.addEventNotification(
         s3.EventType.OBJECT_CREATED,
