@@ -10,7 +10,6 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-
 export class ImportServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -41,19 +40,42 @@ export class ImportServiceStack extends cdk.Stack {
       resources: [`${importBucket.bucketArn}/*`]
     }));
 
+    const basicAuthorizerArn = cdk.Fn.importValue('BasicAuthorizerFunctionArn');
+    const basicAuthorizer = lambda.Function.fromFunctionArn(
+        this,
+        'BasicAuthorizer',
+        basicAuthorizerArn
+    );
+
     const api = new apigw.RestApi(this, 'ImportApi', {
       defaultCorsPreflightOptions: {
         allowOrigins: apigw.Cors.ALL_ORIGINS,
-        allowMethods: apigw.Cors.ALL_METHODS,
+        allowMethods: ['GET', 'OPTIONS'],
+        allowHeaders: [
+          'Content-Type',
+          'X-Amz-Date',
+          'Authorization',
+          'X-Api-Key',
+          'X-Amz-Security-Token',
+        ],
+        allowCredentials: true,
       },
       deployOptions: { stageName: 'dev' }
+    });
+
+    const authorizer = new apigw.TokenAuthorizer(this, 'BasicTokenAuthorizer', {
+      handler: basicAuthorizer,
+      identitySource: 'method.request.header.Authorization',
+      resultsCacheTtl: cdk.Duration.seconds(0)
     });
 
     const importResource = api.root.addResource('import');
     importResource.addMethod('GET', new apigw.LambdaIntegration(importProductsFile), {
       requestParameters: {
         'method.request.querystring.name': true
-      }
+      },
+      authorizer: authorizer,
+      authorizationType: apigw.AuthorizationType.CUSTOM
     });
 
     new cdk.CfnOutput(this, 'ImportApiUrl', {
